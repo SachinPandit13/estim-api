@@ -4,4 +4,8 @@ venv/
 .python_env
 .env
 .env.*
+!.env.example
 .venv
+alembic/versions/__pycache__/
+__pycache__/
+AGENTS.md
