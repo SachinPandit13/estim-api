@@ -1,9 +1,11 @@
+from app.db.config import settings
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+from app.db.base_class import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,12 +20,17 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
+target_metadata = Base.MetaData
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
+
+
+def get_url():
+    url = settings.database_url
+    return url
 
 
 def run_migrations_offline() -> None:
@@ -38,7 +45,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -48,6 +55,28 @@ def run_migrations_offline() -> None:
 
     with context.begin_transaction():
         context.run_migrations()
+
+
+def process_revision_directives(context, revision, directives):
+    """Prevent empty migrations from being created."""
+    if not directives:
+        return
+
+    script = directives[0]
+    # Check if the migration is empty (no upgrade operations)
+    # An empty migration has no ops in upgrade_ops
+    upgrade_ops = getattr(script, "upgrade_ops", None)
+
+    # Check if there are any operations
+    has_operations = False
+    if upgrade_ops is not None:
+        ops = getattr(upgrade_ops, "ops", [])
+        has_operations = len(ops) > 0
+
+    # If no operations, skip creating the migration file
+    if not has_operations:
+        directives[:] = []
+        print("No changes detected. Skipping empty migration.")
 
 
 def run_migrations_online() -> None:
@@ -64,9 +93,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
