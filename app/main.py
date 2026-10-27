@@ -112,7 +112,7 @@ app.add_middleware(DatabasePoolMonitoringMiddleware)
 # app.add_middleware(LogtoAuthMiddleware)
 
 # rate limit middleware
-app.add_middleware(SlowAPIMiddleware)
+# app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(ApiAuditMiddleware)
 
 # Configure CORS — must be added last so it is outermost and handles OPTIONS preflights first
@@ -130,7 +130,7 @@ install_timing_hooks()
 # templates = Jinja2Templates(directory="app/templates")
 
 # app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # add_pagination(app)
 
