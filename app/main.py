@@ -4,7 +4,7 @@ import os, traceback
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# from app.api.routers import configure_app
+from app.v1.routers import configure_app
 from app.db.session import (
     get_pool_status,
     check_and_cleanup_pool,
@@ -134,7 +134,7 @@ install_timing_hooks()
 
 # add_pagination(app)
 
-# configure_app(app)
+configure_app(app)
 
 
 @app.get("/health/db-pool")
