@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.v1.detections.schemas import DetectionEventRead
+from app.v1.detections.schemas import DetectionEventRead, FrameInferenceRequest, FrameInferenceResponse
 from app.v1.detections.services import DetectionService
 
 router = APIRouter(prefix="/detections", tags=["Detections"])
@@ -17,3 +17,12 @@ def list_detections(
     db: Session = Depends(get_db),
 ):
     return DetectionService.get_all(db, camera_id, event_type, limit, offset)
+
+
+@router.post("/infer", response_model=FrameInferenceResponse)
+def infer_frame(
+    payload: FrameInferenceRequest,
+    db: Session = Depends(get_db),
+):
+    return DetectionService.infer_frame(db, payload)
+
