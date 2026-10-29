@@ -44,6 +44,7 @@ class FrameInferenceRequest(BaseModel):
     image_base64: Optional[str] = None
     trigger_incidents: bool = True
     simulated_detections: Optional[list[dict[str, Any]]] = None
+    environmental_hazards: Optional[list[str]] = None
 
 
 class FrameInferenceResponse(BaseModel):
@@ -51,6 +52,7 @@ class FrameInferenceResponse(BaseModel):
     timestamp: datetime
     tracked_workers: list[TrackedObject]
     violations_detected: list[str]
+    hazards_detected: list[str] = []
     incident_created: bool = False
     incident_id: Optional[str] = None
     zone_alerts: list[str] = []
