@@ -9,3 +9,4 @@ venv/
 alembic/versions/__pycache__/
 __pycache__/
 AGENTS.md
+yolov8n.pt
