@@ -5,6 +5,8 @@ from app.v1.incidents.models import SafetyIncident
 from app.v1.users.models import User
 from app.v1.incidents.schemas import IncidentCreate, IncidentResolve
 from app.v1.incidents.functions import determine_severity
+from app.v1.notifications.models import Notification
+from app.v1.ws.manager import ws_manager
 
 
 
@@ -99,11 +101,12 @@ class IncidentService:
             db.refresh(existing)
             return existing
 
+        severity = determine_severity(event_type)
         new_incident = SafetyIncident(
             camera_id=camera_id,
             zone_id=zone_id,
             incident_type=event_type,
-            severity=determine_severity(event_type),
+            severity=severity,
             status="open",
             first_detected_at=now,
             last_detected_at=now,
@@ -113,4 +116,31 @@ class IncidentService:
         db.add(new_incident)
         db.commit()
         db.refresh(new_incident)
+
+        # Automatically record Notification and broadcast real-time WebSocket alert to admins
+        clean_title = f"Safety Violation: {event_type.replace('_', ' ').title()}"
+        clean_msg = f"Camera '{camera_id}' reported {event_type.replace('_', ' ')} incident requiring attention."
+        notif = Notification(
+            incident_id=new_incident.id,
+            camera_id=camera_id,
+            title=clean_title,
+            message=clean_msg,
+            severity=severity,
+        )
+        db.add(notif)
+        db.commit()
+
+        # Real-time WebSocket broadcast to all connected dashboards
+        ws_manager.broadcast_sync({
+            "type": "SAFETY_ALERT",
+            "incident_id": new_incident.id,
+            "event_type": event_type,
+            "camera_id": camera_id,
+            "zone_id": zone_id,
+            "severity": severity,
+            "title": clean_title,
+            "message": clean_msg,
+            "timestamp": now.isoformat(),
+        })
+
         return new_incident
