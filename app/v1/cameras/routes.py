@@ -30,7 +30,7 @@ def test_camera_stream(camera_id: str, db: Session = Depends(get_db)):
     camera = CameraService.get_by_id(db, camera_id)
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
-    return CameraService.test_connection(camera)
+    return CameraService.test_connection(camera, db=db)
 
 
 @router.patch("/{camera_id}/toggle", response_model=CameraRead)
