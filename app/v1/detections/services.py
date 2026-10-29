@@ -12,6 +12,7 @@ from app.v1.detections.schemas import (
 )
 from app.v1.zones.models import CameraZone
 from app.v1.incidents.services import IncidentService
+from app.v1.detections.yolo_service import yolo_service
 
 
 def is_point_in_polygon(x: float, y: float, polygon: Any) -> bool:
@@ -94,16 +95,20 @@ class CameraTrackerState:
 
             # Match with closest existing track within distance threshold
             best_id = None
-            best_dist = 0.40  # 40% frame distance threshold
+            preset_id = cand.get("assigned_track_id")
+            if preset_id is not None and preset_id in self.tracks and preset_id not in matched_track_ids:
+                best_id = preset_id
+            else:
+                best_dist = 0.40  # 40% frame distance threshold
 
-            for tid, track in self.tracks.items():
-                if tid in matched_track_ids:
-                    continue
-                tcx, tcy = track.centroid
-                dist = math.hypot(cx - tcx, cy - tcy)
-                if dist < best_dist:
-                    best_dist = dist
-                    best_id = tid
+                for tid, track in self.tracks.items():
+                    if tid in matched_track_ids:
+                        continue
+                    tcx, tcy = track.centroid
+                    dist = math.hypot(cx - tcx, cy - tcy)
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_id = tid
 
             if best_id is not None:
                 track = self.tracks[best_id]
@@ -119,8 +124,8 @@ class CameraTrackerState:
                 matched_track_ids.add(best_id)
                 assigned_id = best_id
             else:
-                assigned_id = self.next_id
-                self.next_id += 1
+                assigned_id = preset_id if preset_id is not None else self.next_id
+                self.next_id = max(self.next_id + 1, assigned_id + 1)
                 new_track = ActiveTrack(
                     track_id=assigned_id,
                     bbox=bbox,
@@ -217,10 +222,28 @@ class DetectionService:
 
         # 2. Extract worker detection candidates
         candidates = []
-        if payload.simulated_detections is not None:
+        if payload.image_base64 and yolo_service.is_available:
+            yolo_candidates = yolo_service.infer_and_track(
+                image_base64=payload.image_base64,
+                camera_id=payload.camera_id,
+            )
+            if yolo_candidates:
+                candidates = yolo_candidates
+                # If simulated_detections specifies test overrides, apply to detected tracks
+                if payload.simulated_detections:
+                    for i, cand in enumerate(candidates):
+                        if i < len(payload.simulated_detections):
+                            sim = payload.simulated_detections[i]
+                            if "has_helmet" in sim and sim["has_helmet"] is False:
+                                cand["has_helmet"] = False
+                            if "has_vest" in sim and sim["has_vest"] is False:
+                                cand["has_vest"] = False
+                            if "is_fallen" in sim and sim["is_fallen"] is True:
+                                cand["is_fallen"] = True
+            elif payload.simulated_detections is not None:
+                candidates = payload.simulated_detections
+        elif payload.simulated_detections is not None:
             candidates = payload.simulated_detections
-        else:
-            candidates = []
 
 
         # 3. Associate detections with persistent Track IDs
