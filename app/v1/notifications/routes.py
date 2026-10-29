@@ -17,6 +17,24 @@ def list_notifications(
     return NotificationService.get_user_notifications(db, user_id, limit)
 
 
+@router.get("/unread-count", response_model=dict)
+def get_unread_count(
+    user_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    count = NotificationService.get_unread_count(db, user_id)
+    return {"unread_count": count}
+
+
+@router.patch("/read-all", response_model=dict)
+def mark_all_notifications_read(
+    user_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    count = NotificationService.mark_all_read(db, user_id)
+    return {"updated_count": count}
+
+
 @router.patch("/{notification_id}/read", response_model=NotificationRead)
 def mark_notification_read(notification_id: str, db: Session = Depends(get_db)):
     notif = NotificationService.mark_read(db, notification_id)
@@ -25,7 +43,9 @@ def mark_notification_read(notification_id: str, db: Session = Depends(get_db)):
     return notif
 
 
-@router.patch("/read-all", response_model=dict)
-def mark_all_notifications_read(user_id: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    count = NotificationService.mark_all_read(db, user_id)
-    return {"updated_count": count}
+@router.patch("/{notification_id}/unread", response_model=NotificationRead)
+def mark_notification_unread(notification_id: str, db: Session = Depends(get_db)):
+    notif = NotificationService.mark_unread(db, notification_id)
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return notif
