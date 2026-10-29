@@ -24,3 +24,34 @@ class DetectionEventRead(DetectionEventBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TrackedObject(BaseModel):
+    track_id: int
+    class_name: str = "worker"
+    confidence: float
+    bbox: list[float]  # [x_min, y_min, x_max, y_max] normalized 0.0 - 1.0
+    has_helmet: bool = True
+    has_vest: bool = True
+    is_fallen: bool = False
+    violation_type: Optional[str] = None
+    current_zone_name: Optional[str] = None
+    status: str = "compliant"  # "compliant" | "warning" | "violation"
+
+
+class FrameInferenceRequest(BaseModel):
+    camera_id: str
+    image_base64: Optional[str] = None
+    trigger_incidents: bool = True
+    simulated_detections: Optional[list[dict[str, Any]]] = None
+
+
+class FrameInferenceResponse(BaseModel):
+    camera_id: str
+    timestamp: datetime
+    tracked_workers: list[TrackedObject]
+    violations_detected: list[str]
+    incident_created: bool = False
+    incident_id: Optional[str] = None
+    zone_alerts: list[str] = []
+
