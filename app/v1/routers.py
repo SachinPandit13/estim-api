@@ -7,6 +7,7 @@ from app.v1.detections.routes import router as detections_router
 from app.v1.incidents.routes import router as incidents_router
 from app.v1.notifications.routes import router as notifications_router
 from app.v1.dashboard.routes import router as dashboard_router
+from app.v1.ws.routes import router as ws_router
 
 
 def configure_app(app: FastAPI) -> None:
@@ -20,3 +21,4 @@ def configure_app(app: FastAPI) -> None:
     app.include_router(incidents_router, prefix=api_v1_prefix)
     app.include_router(notifications_router, prefix=api_v1_prefix)
     app.include_router(dashboard_router, prefix=api_v1_prefix)
+    app.include_router(ws_router, prefix=api_v1_prefix)
