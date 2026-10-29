@@ -80,6 +80,11 @@ class CameraTrackerState:
         self.frame_counter += 1
         now = datetime.now(timezone.utc)
         results: list[TrackedObject] = []
+
+        if not candidates:
+            self.tracks.clear()
+            return results
+
         matched_track_ids = set()
 
         for cand in candidates:
@@ -102,7 +107,10 @@ class CameraTrackerState:
 
             if best_id is not None:
                 track = self.tracks[best_id]
-                track.bbox = bbox
+                # Smooth bounding box with Exponential Moving Average (EMA) to eliminate jitter
+                track.bbox = [
+                    round(0.65 * track.bbox[i] + 0.35 * bbox[i], 4) for i in range(4)
+                ]
                 track.has_helmet = cand.get("has_helmet", True)
                 track.has_vest = cand.get("has_vest", True)
                 track.is_fallen = cand.get("is_fallen", False)
@@ -130,7 +138,7 @@ class CameraTrackerState:
         for tid, track in self.tracks.items():
             if tid not in matched_track_ids:
                 track.missing_frames += 1
-                if track.missing_frames > 15:
+                if track.missing_frames > 4:
                     dead_ids.append(tid)
 
         for tid in dead_ids:
@@ -243,15 +251,15 @@ class DetectionService:
         for cand in candidates:
             track_id = cand.get("assigned_track_id", 1)
             active_track = tracker.tracks.get(track_id)
-            bbox = cand.get("bbox", [0.3, 0.2, 0.7, 0.85])
+            bbox = active_track.bbox if active_track else cand.get("bbox", [0.3, 0.2, 0.7, 0.85])
             confidence = cand.get("confidence", 0.92)
 
             w = bbox[2] - bbox[0]
             h = bbox[3] - bbox[1]
             aspect_ratio = w / (h if h > 0.01 else 0.01)
 
-            # Fall detection check: horizontal aspect ratio > 1.3
-            is_fallen = cand.get("is_fallen", False) or (aspect_ratio > 1.3)
+            # Fall detection check: strictly when horizontally prone at floor level
+            is_fallen = bool(cand.get("is_fallen", False)) or (aspect_ratio > 1.65 and bbox[3] > 0.82 and h < 0.28)
 
             # Worker foot/anchor point for zone testing: (bottom center)
             foot_x = (bbox[0] + bbox[2]) / 2.0
