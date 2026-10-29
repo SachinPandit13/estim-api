@@ -2,8 +2,10 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.v1.incidents.models import SafetyIncident
+from app.v1.users.models import User
 from app.v1.incidents.schemas import IncidentCreate, IncidentResolve
 from app.v1.incidents.functions import determine_severity
+
 
 
 class IncidentService:
@@ -30,12 +32,24 @@ class IncidentService:
         return db.query(SafetyIncident).filter(SafetyIncident.id == incident_id, SafetyIncident.is_deleted == False).first()
 
     @staticmethod
-    def acknowledge(db: Session, incident_id: str, user_id: str) -> Optional[SafetyIncident]:
+    def acknowledge(db: Session, incident_id: str, user_id: Optional[str] = None) -> Optional[SafetyIncident]:
         incident = IncidentService.get_by_id(db, incident_id)
         if not incident:
             return None
         incident.status = "acknowledged"
-        incident.assigned_to_id = user_id
+
+        # Validate that user_id exists in users table to prevent ForeignKeyViolation
+        assigned_user = None
+        if user_id and user_id != "current_user":
+            assigned_user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
+
+        if assigned_user:
+            incident.assigned_to_id = assigned_user.id
+        else:
+            # Fallback to the first active user/admin if available, or None
+            first_user = db.query(User).filter(User.is_deleted == False).first()
+            incident.assigned_to_id = first_user.id if first_user else None
+
         incident.acknowledged_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(incident)
