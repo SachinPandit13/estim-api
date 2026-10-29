@@ -220,9 +220,25 @@ class DetectionService:
 
         tracked_workers: list[TrackedObject] = []
         violations_detected: list[str] = []
+        hazards_detected: list[str] = []
         zone_alerts: list[str] = []
         incident_created = False
         incident_id = None
+
+        # Process immediate site environmental hazards (fire, smoke)
+        if payload.environmental_hazards:
+            for hazard in payload.environmental_hazards:
+                hazards_detected.append(hazard)
+                if payload.trigger_incidents:
+                    hazard_incident = IncidentService.process_detection(
+                        db=db,
+                        camera_id=payload.camera_id,
+                        event_type=hazard,
+                        zone_id=None,
+                        cooldown_seconds=30,
+                    )
+                    incident_created = True
+                    incident_id = hazard_incident.id
 
         for cand in candidates:
             track_id = cand.get("assigned_track_id", 1)
@@ -348,6 +364,7 @@ class DetectionService:
             timestamp=now,
             tracked_workers=tracked_workers,
             violations_detected=list(set(violations_detected)),
+            hazards_detected=list(set(hazards_detected)),
             incident_created=incident_created,
             incident_id=incident_id,
             zone_alerts=zone_alerts,
