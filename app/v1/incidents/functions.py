@@ -2,7 +2,9 @@
 
 SEVERITY_MAPPING = {
     "fire": "critical",
+    "fire_detected": "critical",
     "smoke": "critical",
+    "smoke_detected": "critical",
     "worker_fall": "critical",
     "worker_fall_detected": "critical",
     "missing_helmet": "medium",
