@@ -18,6 +18,17 @@ class NotificationService:
         return query.order_by(Notification.created_at.desc()).limit(limit).all()
 
     @staticmethod
+    def get_unread_count(db: Session, user_id: Optional[str] = None) -> int:
+        query = db.query(Notification).filter(
+            Notification.is_read == False, Notification.is_deleted == False
+        )
+        if user_id:
+            query = query.filter(
+                (Notification.user_id == user_id) | (Notification.user_id.is_(None))
+            )
+        return query.count()
+
+    @staticmethod
     def mark_read(db: Session, notification_id: str) -> Optional[Notification]:
         notif = (
             db.query(Notification)
@@ -30,6 +41,23 @@ class NotificationService:
             return None
         notif.is_read = True
         notif.read_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(notif)
+        return notif
+
+    @staticmethod
+    def mark_unread(db: Session, notification_id: str) -> Optional[Notification]:
+        notif = (
+            db.query(Notification)
+            .filter(
+                Notification.id == notification_id, Notification.is_deleted == False
+            )
+            .first()
+        )
+        if not notif:
+            return None
+        notif.is_read = False
+        notif.read_at = None
         db.commit()
         db.refresh(notif)
         return notif
