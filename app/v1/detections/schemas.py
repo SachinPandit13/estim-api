@@ -34,6 +34,9 @@ class TrackedObject(BaseModel):
     has_helmet: bool = True
     has_vest: bool = True
     is_fallen: bool = False
+    helmet_status: str = "unknown"  # compliant | violation | unknown
+    vest_status: str = "unknown"
+    pose_status: str = "unknown"
     violation_type: Optional[str] = None
     current_zone_name: Optional[str] = None
     status: str = "compliant"  # "compliant" | "warning" | "violation"
