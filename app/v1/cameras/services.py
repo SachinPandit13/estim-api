@@ -66,6 +66,13 @@ class CameraService:
         db.add(camera)
         db.commit()
         db.refresh(camera)
+        try:
+            from app.v1.ai.worker import worker_manager
+
+            if camera.is_enabled and camera.stream_url and source_type in ("rtsp", "dvr", "ip"):
+                worker_manager.start_camera(camera.id, camera.stream_url)
+        except Exception:
+            pass
         return camera
 
     @staticmethod
@@ -101,13 +108,53 @@ class CameraService:
             config["dvr_port"] = port
             config["subtype"] = subtype
 
+        old_url = camera.stream_url
         for key, val in update_data.items():
+            if key == "rtsp_password" and (val is None or val == ""):
+                continue  # blank password = keep existing
             setattr(camera, key, val)
 
+        if payload.dvr_channel is not None:
+            config["dvr_channel"] = payload.dvr_channel
         camera.config = config
         db.commit()
         db.refresh(camera)
+
+        # Reconnect AI worker when stream endpoint changes
+        try:
+            from app.v1.ai.worker import worker_manager
+            from app.v1.ai.tracking import reset_camera_tracker
+            from app.v1.ai.models.person import reset_person_tracker
+
+            if camera.is_enabled and camera.stream_url and camera.source_type in ("rtsp", "dvr", "ip"):
+                if camera.stream_url != old_url or payload.dvr_host or payload.dvr_channel or payload.dvr_port:
+                    reset_camera_tracker(camera.id)
+                    reset_person_tracker(camera.id)
+                    worker_manager.restart_camera(camera.id, camera.stream_url)
+            else:
+                worker_manager.stop_camera(camera.id)
+        except Exception:
+            pass
+
         return camera
+
+    @staticmethod
+    def soft_delete(db: Session, camera_id: str) -> bool:
+        camera = CameraService.get_by_id(db, camera_id)
+        if not camera:
+            return False
+        camera.is_deleted = True
+        camera.is_enabled = False
+        db.commit()
+        try:
+            from app.v1.ai.worker import worker_manager
+            from app.v1.ai.tracking import drop_camera_tracker
+
+            worker_manager.stop_camera(camera_id)
+            drop_camera_tracker(camera_id)
+        except Exception:
+            pass
+        return True
 
     @staticmethod
     def toggle_enabled(db: Session, camera_id: str) -> Optional[Camera]:
@@ -117,6 +164,15 @@ class CameraService:
         camera.is_enabled = not camera.is_enabled
         db.commit()
         db.refresh(camera)
+        try:
+            from app.v1.ai.worker import worker_manager
+
+            if camera.is_enabled and camera.stream_url and camera.source_type in ("rtsp", "dvr", "ip"):
+                worker_manager.start_camera(camera.id, camera.stream_url)
+            else:
+                worker_manager.stop_camera(camera.id)
+        except Exception:
+            pass
         return camera
 
     @staticmethod
