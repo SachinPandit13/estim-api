@@ -1,6 +1,8 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page, Params
+from fastapi_pagination.ext.sqlalchemy import paginate
 from app.db.session import get_db
 from app.v1.detections.schemas import DetectionEventRead, FrameInferenceRequest, FrameInferenceResponse
 from app.v1.detections.services import DetectionService
@@ -8,15 +10,19 @@ from app.v1.detections.services import DetectionService
 router = APIRouter(prefix="/detections", tags=["Detections"])
 
 
-@router.get("", response_model=list[DetectionEventRead])
+@router.get("", response_model=Page[DetectionEventRead])
 def list_detections(
     camera_id: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(10, ge=1, le=100, description="Page size"),
+    limit: Optional[int] = Query(None, ge=1, le=100, description="Legacy limit compatibility"),
     db: Session = Depends(get_db),
 ):
-    return DetectionService.get_all(db, camera_id, event_type, limit, offset)
+    actual_size = limit if limit is not None else size
+    params = Params(page=page, size=actual_size)
+    query = DetectionService.get_query(db, camera_id, event_type)
+    return paginate(query, params)
 
 
 @router.post("/infer", response_model=FrameInferenceResponse)
