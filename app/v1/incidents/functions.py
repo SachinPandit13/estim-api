@@ -2,12 +2,21 @@
 
 SEVERITY_MAPPING = {
     "fire": "critical",
+    "fire_detected": "critical",
     "smoke": "critical",
-    "worker_fall": "high",
+    "smoke_detected": "critical",
+    "worker_fall": "critical",
+    "worker_fall_detected": "critical",
     "missing_helmet": "medium",
+    "no_helmet": "medium",
     "missing_vest": "low",
+    "no_vest": "low",
+    "zone_intrusion": "high",
+    "forklift_proximity": "high",
 }
 
 
 def determine_severity(incident_type: str) -> str:
-    return SEVERITY_MAPPING.get(incident_type, "medium")
+    key = incident_type.strip().lower() if incident_type else ""
+    return SEVERITY_MAPPING.get(key, "medium")
+

@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import os, traceback
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi_pagination import add_pagination
 
 from app.v1.routers import configure_app
 from app.db.session import (
@@ -10,20 +12,11 @@ from app.db.session import (
     check_and_cleanup_pool,
 )
 
-# from asyncio import get_event_loop
 from contextlib import asynccontextmanager
 
-# from app.api.analytics.worker import start_worker, stop_worker
 from collections import defaultdict
 from app.core.logging_config import setup_logger
 
-# from app.core.limiter import limiter
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-from slowapi import _rate_limit_exceeded_handler
-
-# from middleware import LogtoAuthMiddleware
-# from fastapi_pagination import add_pagination
 from app.db.config import settings
 from app.core.request_timing import (
     ApiAuditHandlerStartMiddleware,
@@ -35,6 +28,7 @@ logger = setup_logger(__name__)
 
 # Create necessary directories
 os.makedirs("uploads", exist_ok=True)
+os.makedirs(settings.SNAPSHOTS_DIR, exist_ok=True)
 
 
 class ErrorLoggingMiddleware(BaseHTTPMiddleware):
@@ -96,10 +90,30 @@ class DatabasePoolMonitoringMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.v1.ai.executor import start_executor, stop_executor
+    from app.v1.ai.worker import worker_manager
+    from app.v1.ai.models.registry import model_registry
+    from app.v1.ai.evidence import ensure_snapshots_dir
+
+    ensure_snapshots_dir()
+    start_executor()
+    try:
+        model_registry.ensure_person()
+    except Exception as exc:
+        logger.warning("Person model preload skipped: %s", exc)
+    try:
+        worker_manager.start_all_enabled()
+    except Exception as exc:
+        logger.warning("RTSP workers start skipped: %s", exc)
     yield
+    worker_manager.stop_all()
+    stop_executor()
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Serve evidence snapshots and uploads
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # add middlewares
 # First added is innermost. Audit handler-start sits next to the app;
@@ -132,7 +146,7 @@ install_timing_hooks()
 # app.state.limiter = limiter
 # app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# add_pagination(app)
+add_pagination(app)
 
 configure_app(app)
 
@@ -149,6 +163,13 @@ async def db_pool_status():
         }
     else:
         return {"status": "error", "message": "Unable to get pool status"}
+
+
+@app.get("/health/ai")
+async def ai_health():
+    from app.v1.ai.health import get_ai_health
+
+    return get_ai_health()
 
 
 if __name__ == "__main__":
