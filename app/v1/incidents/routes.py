@@ -2,6 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
 from jose import jwt
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page, Params
+from fastapi_pagination.ext.sqlalchemy import paginate
 from app.db.session import get_db
 from app.v1.auth.functions import SECRET_KEY, ALGORITHM
 from app.v1.incidents.schemas import IncidentRead, IncidentResolve
@@ -10,16 +12,20 @@ from app.v1.incidents.services import IncidentService
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
 
 
-@router.get("", response_model=list[IncidentRead])
+@router.get("", response_model=Page[IncidentRead])
 def list_incidents(
     status: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     camera_id: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(10, ge=1, le=100, description="Page size"),
+    limit: Optional[int] = Query(None, ge=1, le=100, description="Legacy limit compatibility"),
     db: Session = Depends(get_db),
 ):
-    return IncidentService.get_all(db, status, severity, camera_id, limit, offset)
+    actual_size = limit if limit is not None else size
+    params = Params(page=page, size=actual_size)
+    query = IncidentService.get_query(db, status, severity, camera_id)
+    return paginate(query, params)
 
 
 @router.get("/{incident_id}", response_model=IncidentRead)

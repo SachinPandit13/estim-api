@@ -12,6 +12,23 @@ from app.v1.ws.manager import ws_manager
 
 class IncidentService:
     @staticmethod
+    def get_query(
+        db: Session,
+        status: Optional[str] = None,
+        severity: Optional[str] = None,
+        camera_id: Optional[str] = None,
+    ):
+        """Return an ordered SQLAlchemy query for use with fastapi-pagination."""
+        query = db.query(SafetyIncident).filter(SafetyIncident.is_deleted == False)
+        if status:
+            query = query.filter(SafetyIncident.status == status)
+        if severity:
+            query = query.filter(SafetyIncident.severity == severity)
+        if camera_id:
+            query = query.filter(SafetyIncident.camera_id == camera_id)
+        return query.order_by(SafetyIncident.last_detected_at.desc())
+
+    @staticmethod
     def get_all(
         db: Session,
         status: Optional[str] = None,
@@ -20,14 +37,7 @@ class IncidentService:
         limit: int = 50,
         offset: int = 0,
     ) -> list[SafetyIncident]:
-        query = db.query(SafetyIncident).filter(SafetyIncident.is_deleted == False)
-        if status:
-            query = query.filter(SafetyIncident.status == status)
-        if severity:
-            query = query.filter(SafetyIncident.severity == severity)
-        if camera_id:
-            query = query.filter(SafetyIncident.camera_id == camera_id)
-        return query.order_by(SafetyIncident.last_detected_at.desc()).offset(offset).limit(limit).all()
+        return IncidentService.get_query(db, status, severity, camera_id).offset(offset).limit(limit).all()
 
     @staticmethod
     def get_by_id(db: Session, incident_id: str) -> Optional[SafetyIncident]:
