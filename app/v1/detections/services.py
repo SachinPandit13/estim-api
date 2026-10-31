@@ -88,18 +88,16 @@ def _normalize_sim_candidates(sims: list[dict[str, Any]]) -> list[dict[str, Any]
 
 class DetectionService:
     @staticmethod
-    def get_all(
+    def get_query(
         db: Session,
         camera_id: Optional[str] = None,
         event_type: Optional[str] = None,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> list[DetectionEvent]:
+    ):
+        """Return an ordered SQLAlchemy query for use with fastapi-pagination."""
         query = db.query(DetectionEvent).filter(DetectionEvent.is_deleted == False)
         if camera_id:
             query = query.filter(DetectionEvent.camera_id == camera_id)
         if event_type:
-            # Accept short filters fire/smoke as well as FIRE_DETECTED
             et = event_type.strip()
             if et.lower() == "fire":
                 query = query.filter(DetectionEvent.event_type.in_(["FIRE_DETECTED", "fire", "fire_detected"]))
@@ -107,7 +105,17 @@ class DetectionService:
                 query = query.filter(DetectionEvent.event_type.in_(["SMOKE_DETECTED", "smoke", "smoke_detected"]))
             else:
                 query = query.filter(DetectionEvent.event_type == event_type)
-        return query.order_by(DetectionEvent.detected_at.desc()).offset(offset).limit(limit).all()
+        return query.order_by(DetectionEvent.detected_at.desc())
+
+    @staticmethod
+    def get_all(
+        db: Session,
+        camera_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[DetectionEvent]:
+        return DetectionService.get_query(db, camera_id, event_type).offset(offset).limit(limit).all()
 
     @staticmethod
     def create(db: Session, payload: DetectionEventCreate) -> DetectionEvent:
