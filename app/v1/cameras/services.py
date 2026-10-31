@@ -177,12 +177,19 @@ class CameraService:
 
     @staticmethod
     def test_connection(camera: Camera, db: Optional[Session] = None) -> CameraTestResponse:
-        # 1. Local system webcam probe
-        if camera.source_type and camera.source_type.lower() in ["webcam", "usb", "device"]:
+        # 1. Local system webcam / demo asset probe
+        source = (camera.source_type or "").lower()
+        if source in ["webcam", "usb", "device", "demo"]:
+            if db:
+                camera.status = "online"
+                camera.last_connected_at = datetime.now(timezone.utc)
+                camera.last_error = None
+                db.commit()
+            label = "Demo video source" if source == "demo" else "Local system device camera"
             return CameraTestResponse(
                 reachable=True,
                 status="online",
-                message=f"Local system device camera verified for {camera.name}",
+                message=f"{label} verified for {camera.name}",
                 latency_ms=0.5,
             )
 
