@@ -1,6 +1,8 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page, Params
+from fastapi_pagination.ext.sqlalchemy import paginate
 from app.db.session import get_db
 from app.v1.notifications.schemas import NotificationRead
 from app.v1.notifications.services import NotificationService
@@ -8,13 +10,18 @@ from app.v1.notifications.services import NotificationService
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
-@router.get("", response_model=list[NotificationRead])
+@router.get("", response_model=Page[NotificationRead])
 def list_notifications(
     user_id: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(10, ge=1, le=100, description="Page size (default 10)"),
+    limit: Optional[int] = Query(None, ge=1, le=100, description="Legacy limit compatibility"),
     db: Session = Depends(get_db),
 ):
-    return NotificationService.get_user_notifications(db, user_id, limit)
+    actual_size = limit if limit is not None else size
+    params = Params(page=page, size=actual_size)
+    query = NotificationService.get_user_notifications_query(db, user_id)
+    return paginate(query, params)
 
 
 @router.get("/unread-count", response_model=dict)

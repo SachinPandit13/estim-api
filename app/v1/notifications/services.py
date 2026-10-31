@@ -7,15 +7,21 @@ from app.v1.notifications.schemas import NotificationCreate
 
 class NotificationService:
     @staticmethod
-    def get_user_notifications(
-        db: Session, user_id: Optional[str] = None, limit: int = 50
-    ) -> list[Notification]:
+    def get_user_notifications_query(
+        db: Session, user_id: Optional[str] = None
+    ):
         query = db.query(Notification).filter(Notification.is_deleted == False)
         if user_id:
             query = query.filter(
                 (Notification.user_id == user_id) | (Notification.user_id.is_(None))
             )
-        return query.order_by(Notification.created_at.desc()).limit(limit).all()
+        return query.order_by(Notification.created_at.desc())
+
+    @staticmethod
+    def get_user_notifications(
+        db: Session, user_id: Optional[str] = None, limit: int = 50
+    ) -> list[Notification]:
+        return NotificationService.get_user_notifications_query(db, user_id).limit(limit).all()
 
     @staticmethod
     def get_unread_count(db: Session, user_id: Optional[str] = None) -> int:
