@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os, traceback
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi_pagination import add_pagination
 
 from app.v1.routers import configure_app
 from app.db.session import (
@@ -145,7 +146,7 @@ install_timing_hooks()
 # app.state.limiter = limiter
 # app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# add_pagination(app)
+add_pagination(app)
 
 configure_app(app)
 
